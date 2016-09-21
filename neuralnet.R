@@ -37,7 +37,7 @@ error.fun <- function(t, y) {
 	#print("================")
 	#print(str(y))
 	#print("================")
-	return(sum(0.5 * (t - y) ^ 2))
+	return((0.5 * (y - t) ^ 2))
 }
 
 error.df <- function(t, y) {
@@ -105,7 +105,6 @@ abs.max <- function(v) {
 }
 
 recal.weight <- function(wm, df, delta) {
-	#df <- apply(df, 2, mean)
 	df <- apply(df, 2, abs.max)
 	wm <- wm - delta * df
 	return(wm)
@@ -144,6 +143,7 @@ neural.net <- function(x, y, hidden = 1, delta = 0.5,
 	input <- ncol(x)
 	output <- ncol(y)
 	wm <- weight.matrix(input, hidden, output)
+	error <- 0
 	#x <- cbind(x, rep(1, nrow(x)))
 
 	for(i in 1:iter.max) {
@@ -151,11 +151,12 @@ neural.net <- function(x, y, hidden = 1, delta = 0.5,
 		nn <- feedforward(x, wm, act.fun)
 
 		(error <- error.fun(nn[["facf"]][[length(nn[["facf"]])]],  y))
-		if(mean(abs(error) < threshold)) break
+		if((max(error) < threshold)) break
 
 		wm <- backpropagation(wm, nn, y, act.fun, delta)
 		#print(i)
 	}
+	print(max(error))
 	return(list(coef = wm, acf = act.fun, input = input))
 }
 
@@ -174,10 +175,10 @@ predict.nn <- function(fit, x) {
 
 
 test.nn <- function() {
-	half.data <- 100
+	half.data <- 200
 
-	d.f <- data.frame(a = rnorm(half.data, 1), b = rnorm(half.data, 5))
-	d.f <- rbind(d.f, data.frame(a = rnorm(half.data, 5), b = rnorm(half.data, 10)))
+	d.f <- data.frame(a = rnorm(half.data, 1), b = rnorm(half.data, 3))
+	d.f <- rbind(d.f, data.frame(a = rnorm(half.data, 5), b = rnorm(half.data, 7)))
 
 	y <- matrix(c(rep(0, half.data), rep(1, half.data)), ncol = 1)
 	x <- data.matrix(d.f)
@@ -185,7 +186,7 @@ test.nn <- function() {
 
 	rm(d.f)
 
-	(fit <- neural.net(x, y, hidden = 1, delta = 0.5))
+	(fit <- neural.net(x, y, hidden = 5, delta = 0.5, threshold = 0.1))
 	print(predict.nn(fit, x))
 	res <- round(predict.nn(fit, x))
 	table(y, res)
