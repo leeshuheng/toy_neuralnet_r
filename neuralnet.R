@@ -170,12 +170,12 @@ predict.nn <- function(fit, x) {
 	if(ncol(x) != input) stop("error")
 
 	nn <- feedforward(x, wm, act.fun)
-	return(nn[["facf"]][[length(nn)]])
+	return(nn[["facf"]][[length(nn[["facf"]])]])
 }
 
 
 test.nn <- function() {
-	half.data <- 200
+	half.data <- 10
 
 	d.f <- data.frame(a = rnorm(half.data, 1), b = rnorm(half.data, 3))
 	d.f <- rbind(d.f, data.frame(a = rnorm(half.data, 5), b = rnorm(half.data, 7)))
@@ -186,7 +186,7 @@ test.nn <- function() {
 
 	rm(d.f)
 
-	(fit <- neural.net(x, y, hidden = 5, delta = 0.5, threshold = 0.1))
+	(fit <- neural.net(x, y, hidden = c(2), delta = 0.5, threshold = 0.1))
 	print(predict.nn(fit, x))
 	res <- round(predict.nn(fit, x))
 	table(y, res)
