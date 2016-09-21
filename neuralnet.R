@@ -87,14 +87,6 @@ cal.grad <- function(df, node) {
 		}
 	}
 	res <- NULL
-# 	for(i in 1:ncol(df)) {
-# 		for(j in 1:ncol(tmp.df)) {
-# 			tmp <- df[,i, drop = F] * tmp.df[,j, drop = F]
-# 			ifelse(is.null(res),
-# 				   res <- matrix(tmp, ncol = 1),
-# 				   res <- cbind(res, tmp))
-# 		}
-# 	}
 	for(i in 1:ncol(tmp.df)) {
 		tmp <- matrix(rep(0, nrow(tmp.df)), ncol = 1)
 
@@ -108,8 +100,13 @@ cal.grad <- function(df, node) {
 	return(res)
 }
 
+abs.max <- function(v) {
+	return(v[which.max(abs(v))])
+}
+
 recal.weight <- function(wm, df, delta) {
-	df <- apply(df, 2, sum)
+	#df <- apply(df, 2, mean)
+	df <- apply(df, 2, abs.max)
 	wm <- wm - delta * df
 	return(wm)
 }
@@ -138,7 +135,6 @@ backpropagation <- function(wm, nn, y, acf, delta) {
 
 	return(.backpropagation(wm, nn, y, acf.df, delta))
 }
-
 
 neural.net <- function(x, y, hidden = 1, delta = 0.5,
 					   iter.max = 1000L, act.fun = "sigmoid",
@@ -176,24 +172,23 @@ predict.nn <- function(fit, x) {
 	return(nn[["facf"]][[length(nn)]])
 }
 
-test.nn <- function() {
-	d.f <- data.frame(a = rnorm(10, 1), b = rnorm(10, 5))
-	d.f <- rbind(d.f, data.frame(a = rnorm(10, 5), b = rnorm(10, 10)))
 
-	y <- matrix(c(rep(0, 10), rep(1, 10)))
+test.nn <- function() {
+	half.data <- 100
+
+	d.f <- data.frame(a = rnorm(half.data, 1), b = rnorm(half.data, 5))
+	d.f <- rbind(d.f, data.frame(a = rnorm(half.data, 5), b = rnorm(half.data, 10)))
+
+	y <- matrix(c(rep(0, half.data), rep(1, half.data)), ncol = 1)
 	x <- data.matrix(d.f)
 	x <- scale(x)
 
 	rm(d.f)
 
-	mean(x[1:10, 1])
-	mean(x[1:10, 2])
-	mean(x[11:20, 1])
-	mean(x[11:20, 2])
-
-	(fit <- neural.net(x, y, hidden = 3, delta = 0.5))
-	predict.nn(fit, x)
-	round(predict.nn(fit, x))
+	(fit <- neural.net(x, y, hidden = 1, delta = 0.5))
+	print(predict.nn(fit, x))
+	res <- round(predict.nn(fit, x))
+	table(y, res)
 }
 
 test.nn()
