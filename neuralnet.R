@@ -9,7 +9,7 @@ sigmoid <- function(x) {
 }
 
 sigmoid.df <- function(z) {
-	return(z / (1 + z) ^ 2)
+	return(z * (1 - z))
 }
 
 tanh.df <- function(z) {
@@ -25,10 +25,12 @@ weight.matrix <- function(input, hidden, output) {
 	res <- list()
 	for(i in 1:l) {
 		r <- hidden[i]
-		res[[i]] <- matrix(runif(p * r), nrow = p, byrow = T)
+		#res[[i]] <- matrix(runif(p * r), nrow = p, byrow = T)
+		res[[i]] <- matrix(rnorm(p * r, sd = 0.5), nrow = p, byrow = T)
 		p <- r + 1;
 	}
-	res[[l+1]] <- matrix(runif(p * output), nrow = p, byrow = T)
+	#res[[l+1]] <- matrix(runif(p * output), nrow = p, byrow = T)
+	res[[l+1]] <- matrix(rnorm(p * output, sd = 0.5), nrow = p, byrow = T)
 	return(res)
 }
 
@@ -37,11 +39,12 @@ error.fun <- function(t, y) {
 	#print("================")
 	#print(str(y))
 	#print("================")
-	return((0.5 * (y - t) ^ 2))
+	#print(t[,-ncol(t), drop = F])
+	return((0.5 * (y - t[,-ncol(t), drop = F]) ^ 2))
 }
 
 error.df <- function(t, y) {
-	return((t - y))
+	return((t[,-ncol(t), drop = F] - y))
 }
 
 .feedforward <- function(x, w, acf) {
@@ -49,84 +52,158 @@ error.df <- function(t, y) {
 	#print("================")
 	#print(w)
 	#print("================")
-	return(acf(x %*% w))
+	return((x %*% w))
 }
 
+# feedforward <- function(x, w, act.fun) {
+# 	m <- x
+# 	f <- list()
+# 	facf <- list()
+# 	acf <- sigmoid
+# 	if(act.fun == "tanh") acf <- tanh
+# 	for(i in 1:length(w)) {
+# 		m <- cbind(m, rep(1, nrow(x)))
+# 		f[[i]] <- m
+# 
+# 		#print(m)
+# 		#print(w[[i]])
+# 		m <- .feedforward(m, w[[i]], acf)
+# 		facf[[i]] <- m
+# 		#print(m)
+# 		#print("================")
+# 	}
+# 	return(list(f = f, facf = facf))
+# }
+
 feedforward <- function(x, w, act.fun) {
-	m <- x
 	f <- list()
 	facf <- list()
 	acf <- sigmoid
 	if(act.fun == "tanh") acf <- tanh
-	for(i in 1:length(w)) {
-		m <- cbind(m, rep(1, nrow(x)))
-		f[[i]] <- m
 
-		#print(m)
-		#print(w[[i]])
-		m <- .feedforward(m, w[[i]], acf)
-		facf[[i]] <- m
-		#print(m)
-		#print("================")
+	m <- cbind(x, rep(1, nrow(x)))
+	f[[1]] <- NA
+	facf[[1]] <- m
+	l <- length(w)
+	for(i in 1:l) {
+		m <- m %*% w[[i]]
+		f[[i+1]] <- m
+
+		m <- acf(m)
+		m <- cbind(m, rep(1, nrow(m)))
+		facf[[i+1]] <- m
 	}
 	return(list(f = f, facf = facf))
 }
 
-cal.grad <- function(df, node) {
-	tmp.df <- NULL
-	facf <- node[["facf"]]
-	f <- node[["f"]]
-	#print(ncol(df))
-
-	for(i in 1:ncol(facf)) {
-		for(j in 1:(ncol(f))) {
-			tmp <- facf[,i, drop = F] * f[,j, drop = F]
-			ifelse(is.null(tmp.df),
-				   tmp.df <- matrix(tmp, ncol = 1),
-				   tmp.df <- cbind(tmp.df, tmp))
-		}
-	}
-	res <- NULL
-	for(i in 1:ncol(tmp.df)) {
-		tmp <- matrix(rep(0, nrow(tmp.df)), ncol = 1)
-
-		for(j in 1:ncol(df))
-			tmp <- tmp + tmp.df[,i, drop = F] * df[, j, drop = F]
-
-		ifelse(is.null(res),
-			   res <- tmp,
-			   res <- cbind(res, tmp))
-	}
-	return(res)
-}
-
-abs.max <- function(v) {
+select.df <- function(v) {
 	return(v[which.max(abs(v))])
+	#return(sample(v, 1))
+	#return(mean(v))
 }
 
-recal.weight <- function(wm, df, delta) {
-	df <- apply(df, 2, abs.max)
+recal.weight <- function(wm, df, nr, nc, delta) {
+	df <- apply(df, 2, select.df)
+	#print(nr)
+	#print(nc)
+	#print(nrow(wm))
+	#print(ncol(wm))
+	df <- matrix(df, byrow = T, nrow = nr, ncol = nc)
+	#print(df)
 	wm <- wm - delta * df
 	return(wm)
+}
+
+# .backpropagation <- function(wm, nn, y, acf.df, delta) {
+# 	l <- length(nn[["facf"]])
+# 	df <- error.df(nn[["facf"]][[l]], y)
+# 
+# 	for(i in l:1) {
+# 		node <- list(facf = nn[["facf"]][[i]], f = nn[["f"]][[i]])
+# 		rm.col <- ncol(node[["f"]]) * 1:ncol(df)
+# 
+# 		df <- cal.grad(df, node)
+# 		wm[[i]] <- recal.weight(wm[[i]], df, delta)
+# 
+# 		df <- df[,-rm.col, drop = F]
+# 		#print(wm[[i]])
+# 	}
+# 	return(wm)
+# }
+
+# cal.grad <- function(df, node) {
+# 	tmp.df <- NULL
+# 	facf <- node[["facf"]]
+# 	f <- node[["f"]]
+# 	#print(ncol(df))
+# 
+# 	for(i in 1:ncol(facf)) {
+# 		for(j in 1:(ncol(f))) {
+# 			tmp <- facf[,i, drop = F] * f[,j, drop = F]
+# 			ifelse(is.null(tmp.df),
+# 				   tmp.df <- matrix(tmp, ncol = 1),
+# 				   tmp.df <- cbind(tmp.df, tmp))
+# 		}
+# 	}
+# 	res <- NULL
+# 	for(i in 1:ncol(tmp.df)) {
+# 		tmp <- matrix(rep(0, nrow(tmp.df)), ncol = 1)
+# 
+# 		for(j in 1:ncol(df))
+# 			tmp <- tmp + tmp.df[,i, drop = F] * df[, j, drop = F]
+# 
+# 		ifelse(is.null(res),
+# 			   res <- tmp,
+# 			   res <- cbind(res, tmp))
+# 	}
+# 	return(res)
+# }
+
+cal.grad <- function(df, node2, node1, acf.df) {
+	f <- node2[["facf"]]
+	acfdf <- NULL
+	for(i in 1:(ncol(f)-1)) {
+		tmp <- acf.df(f[, i, drop = F])
+		ifelse(is.null(acfdf),
+			   acfdf <- matrix(tmp, ncol = 1),
+			   acfdf <- cbind(acfdf, tmp))
+	}
+	fdf <- NULL
+	for(i in 1:ncol(acfdf)) {
+		tmp <- matrix(rep(0, nrow(df)), ncol = 1)
+		for(j in 1:ncol(df))
+			tmp <- tmp + df[,j, drop = F] * acfdf[,i, drop = F]
+		ifelse(is.null(fdf),
+			   fdf <- matrix(tmp, ncol = 1),
+			   fdf <- cbind(fdf, tmp))
+	}
+	facf <- node1[["facf"]]
+	res <- NULL
+	for(i in 1:ncol(facf)) {
+		for(j in 1:ncol(fdf)) {
+			tmp <- fdf[,j, drop = F] * facf[,i, drop = F]
+			ifelse(is.null(res),
+				   res <- matrix(tmp, ncol = 1),
+				   res <- cbind(res, tmp))
+		}
+	}
+	return(res)
 }
 
 .backpropagation <- function(wm, nn, y, acf.df, delta) {
 	l <- length(nn[["facf"]])
 	df <- error.df(nn[["facf"]][[l]], y)
-
-	for(i in l:1) {
-		node <- list(facf = nn[["facf"]][[i]], f = nn[["f"]][[i]])
-		rm.col <- ncol(node[["f"]]) * 1:ncol(df)
-
-		df <- cal.grad(df, node)
-		wm[[i]] <- recal.weight(wm[[i]], df, delta)
-
-		df <- df[,-rm.col, drop = F]
-		#print(wm[[i]])
+	for(i in l:2) {
+		node2 <- list(f = nn[["f"]][[i]], facf = nn[["facf"]][[i]])
+		node1 <- list(f = nn[["f"]][[i-1]], facf = nn[["facf"]][[i-1]])
+		df <- cal.grad(df, node2, node1, acf.df)
+		nr <- ncol(node1[["facf"]])
+		nc <- ncol(node2[["facf"]]) - 1
+		wm[[i-1]] <- recal.weight(wm[[i-1]], df, nr, nc, delta)
+		df <- df[,1:((nr-1) * nc), drop = F]
 	}
 	return(wm)
 }
-
 
 backpropagation <- function(wm, nn, y, acf, delta) {
 	acf.df <- sigmoid.df
@@ -154,10 +231,12 @@ neural.net <- function(x, y, hidden = 1, delta = 0.5,
 		if((max(error) < threshold)) break
 
 		wm <- backpropagation(wm, nn, y, act.fun, delta)
+		#nn[["facf"]][[4]]
 		#print(i)
 	}
-	print(max(error))
-	return(list(coef = wm, acf = act.fun, input = input))
+	if(max(error) > threshold) print("Not convergence")
+	return(list(coef = wm, acf = act.fun, input = input,
+				error = max(error), conv = max(error) < threshold))
 }
 
 predict.nn <- function(fit, x) {
@@ -170,14 +249,15 @@ predict.nn <- function(fit, x) {
 	if(ncol(x) != input) stop("error")
 
 	nn <- feedforward(x, wm, act.fun)
-	return(nn[["facf"]][[length(nn[["facf"]])]])
+	res <- nn[["facf"]][[length(nn[["facf"]])]]
+	return(res[,-ncol(res), drop = F])
 }
 
 
 test.nn <- function() {
-	half.data <- 10
+	half.data <- 200
 
-	d.f <- data.frame(a = rnorm(half.data, 1), b = rnorm(half.data, 3))
+	d.f <- data.frame(a = rnorm(half.data, 1), b = rnorm(half.data, 2))
 	d.f <- rbind(d.f, data.frame(a = rnorm(half.data, 5), b = rnorm(half.data, 7)))
 
 	y <- matrix(c(rep(0, half.data), rep(1, half.data)), ncol = 1)
@@ -186,10 +266,13 @@ test.nn <- function() {
 
 	rm(d.f)
 
-	(fit <- neural.net(x, y, hidden = c(2), delta = 0.5, threshold = 0.1))
+	(fit <- neural.net(x, y, hidden = c(2, 2, 2), delta = 0.5,
+					   iter.max = 1000L, threshold = 0.1))
 	print(predict.nn(fit, x))
+	if(fit[["conv"]]) print("Convergence")
 	res <- round(predict.nn(fit, x))
-	table(y, res)
+	print(fit)
+	print(table(y, res))
 }
 
 test.nn()
